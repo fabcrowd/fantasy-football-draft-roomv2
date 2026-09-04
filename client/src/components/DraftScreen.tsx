@@ -10,9 +10,10 @@ import {
   undoPick, undoToMyLastPick,
 } from '../engine/draft';
 import type { DraftEngine } from '../engine/draft';
-import { fetchDraftPicks } from '../api';
+import { fetchDraftPicks, fetchEspnDraftPicks } from '../api';
 import { maskTeam } from '../anon';
 import { livePresets, offBoardPlayer } from '../engine/live';
+import type { EspnCredentials } from '../storage';
 import type { AppMode, Board } from '../engine/types';
 
 /** How often the assistant asks Sleeper for new picks. */
@@ -35,6 +36,9 @@ interface Props {
   mode: AppMode;
   anonymous: boolean;
   draftId: string | null;
+  /** An ESPN league to follow instead, when the draft is not on Sleeper. */
+  espnLeagueId: string | null;
+  espnCreds: EspnCredentials;
   rankingEntries: import('../engine/types').RankingEntry[] | null;
   /** What you wrote about a player, by player id. Null when you wrote none. */
   notes: Map<string, string> | null;
@@ -53,9 +57,12 @@ function label(overall: number, teams: number): string {
 
 export default function DraftScreen(props: Props) {
   const {
-    engine, board, pace, mode, anonymous, draftId, rankingEntries, notes,
-    onEngine, onFinish, onLeave,
+    engine, board, pace, mode, anonymous, draftId, espnLeagueId, espnCreds,
+    rankingEntries, notes, onEngine, onFinish, onLeave,
   } = props;
+
+  /** Which feed, if any, fills the board on its own. */
+  const feed = espnLeagueId ? 'espn' : (draftId ? 'sleeper' : null);
 
   const [queue, setQueue] = useState<string[]>([]);
   const [pane, setPane] = useState<Pane>('pool');
@@ -72,7 +79,7 @@ export default function DraftScreen(props: Props) {
    * the poll while it is on, because a feed rebuilding the board underneath
    * you would throw away what you just typed.
    */
-  const [manual, setManual] = useState(!draftId);
+  const [manual, setManual] = useState(!feed);
   const assistant = mode === 'assistant';
 
   const { state } = engine;
@@ -127,17 +134,20 @@ export default function DraftScreen(props: Props) {
   engineRef.current = engine;
 
   useEffect(() => {
-    if (!assistant || !draftId || paused || manual) return undefined;
+    if (!assistant || !feed || paused || manual) return undefined;
     let alive = true;
 
     const poll = async () => {
       try {
-        const live = await fetchDraftPicks(draftId, {
+        const q = {
           scoring: state.league.scoring,
           teams: state.league.teams,
           adpSource: state.league.adpSource,
           year: state.league.year,
-        });
+        };
+        const live = feed === 'espn'
+          ? await fetchEspnDraftPicks(espnLeagueId!, q, espnCreds)
+          : await fetchDraftPicks(draftId!, q);
         if (!alive) return;
 
         const presets = livePresets(live.picks);
@@ -165,7 +175,7 @@ export default function DraftScreen(props: Props) {
     void poll();
     const timer = setInterval(poll, POLL_MS);
     return () => { alive = false; clearInterval(timer); };
-  }, [assistant, draftId, paused, manual, board, rankingEntries,
+  }, [assistant, feed, draftId, espnLeagueId, espnCreds, paused, manual, board, rankingEntries,
     state.league.scoring, state.league.teams, state.league.adpSource, state.league.year]);
 
   // Run the room. One pick per tick so the board reads like a draft, or the
@@ -249,7 +259,9 @@ export default function DraftScreen(props: Props) {
               <span className={'live-dot' + (liveError || manual ? ' is-down' : '')}>
                 <span className="on-wide">
                   {manual ? 'Entering picks by hand'
-                    : (liveError ? 'Feed not answering' : 'Following live')}
+                    : (liveError
+                      ? (feed === 'espn' ? 'ESPN not answering' : 'Sleeper not answering')
+                      : 'Following ' + (feed === 'espn' ? 'ESPN' : 'Sleeper'))}
                 </span>
                 <span className="on-narrow">
                   {manual ? 'By hand' : (liveError ? 'No answer' : 'Live')}

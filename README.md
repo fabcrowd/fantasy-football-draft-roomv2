@@ -6,9 +6,11 @@ What changed and when is in [CHANGELOG.md](CHANGELOG.md).
 A fantasy football draft tool with two modes. **Mock draft** simulates a room
 against you: live ADP for your scoring format, any roster shape, your own
 ranking file, and dials for how hard the computer teams lean on each position.
-**Draft assistant** simulates nothing: it follows your real Sleeper draft as it
-happens, mirroring every pick onto the board so your rankings and availability
-always face the actual room.
+**Draft assistant** simulates nothing: it follows your real draft as it happens
+— from Sleeper, from ESPN, or from you typing the picks in — mirroring every
+pick onto the board so your rankings and availability always face the actual
+room. Once a round is on the board it reads what that room is doing and plays
+the rest of it out against the real rosters.
 
 ---
 
@@ -83,6 +85,16 @@ picks, and the panel says how many.
 this pick buys you over your next one, so you know whether the player you like
 is worth reaching for or whether four just like him are still there.
 
+**Odds read off your room, not off the average one.** Once a full round is
+down, the board stops guessing from ADP and plays the rest of the round out a
+hundred and fifty times against the real rosters and the real picks. A run on
+receivers moves these numbers; ADP cannot see one.
+
+**Picks by hand, for a draft nothing can poll.** A draft on a site this app
+cannot read is still a draft worth having the board for. Assistant mode opens
+ready to take the picks as you type them, and everything downstream — rosters,
+the board, the room model — treats a typed pick like any other.
+
 **A grade at the end.** Starting points and picks gained against ADP, side by
 side, for every team in the room.
 
@@ -106,8 +118,8 @@ draft, which is what most leagues charge, and is marked as the guess it is. A
 player picked up on waivers was never drafted here, so he gets no suggestion at
 all rather than a wrong one, and the import says so.
 
-**Follow a real draft.** In assistant mode the app polls your Sleeper draft
-every few seconds and rebuilds the board from the real picks alone. Nothing is
+**Follow a real draft, on Sleeper or ESPN.** In assistant mode the app polls
+your draft every few seconds and rebuilds the board from the real picks alone. Nothing is
 invented; a commissioner undo is picked up because the board is rebuilt, not
 appended to. Say which manager you are once and your slot follows automatically
 when Sleeper draws the order. A real pick of a player this board does not rank
@@ -351,6 +363,61 @@ Like the survival bar, it reads ADP and not this room, and the panel says so
 under the numbers. A run already under way will not show.
 
 
+## Reading the room
+
+The survival bar assumes every room drafts like the average of thousands of
+rooms. Yours does not, and six backs off the board in ten picks is the fact
+that decides whether the back you want reaches you.
+
+The computer teams already score players against their own open slots. That
+model has only ever been pointed at an invented room. Pointed at the real one,
+with the real rosters and the real picks behind it, and run a hundred and fifty
+times, the same model answers who is likely to be gone before your turn comes
+back. Those odds replace the ADP ones wherever they exist, and the pool marks
+which is which.
+
+**The lean is measured against a simulated room, not against ADP.** Every
+ordinary room drafts away from ADP without leaning anywhere: it takes a
+starting back over a better receiver because it has two back slots to fill, and
+ADP knows nothing about slots. Measured against the ADP order, an ordinary room
+reads as nearly two points of anti-receiver bias — and since that reading is
+handed back to a model which already applies the roster need bonus, the same
+effect would be counted twice. Measured against the same model with its dials
+at zero, an ordinary room reads as ordinary and only what this room does
+differently survives. The checks assert exactly that: a market room reads as no
+lean, a Zero RB room reads as backs down and receivers up.
+
+It costs about a sixth of a second and runs once per pick rather than once per
+render. A hundred and fifty runs is where the numbers stop moving; at three
+hundred they agree to a tenth of a pick.
+
+## A draft on ESPN
+
+ESPN drafts are read through the same board and answer in the same shape, so
+nothing downstream knows which site a draft is on. Two things differ.
+
+**ESPN names nobody.** A Sleeper pick carries a name and a position; an ESPN
+pick carries a numeric player id and nothing else. So ESPN's player list is read
+once, cached for a day, and used to turn those numbers into names the board can
+join on. It joins 298 of the 300 most owned players.
+
+**A private league needs your own cookies.** There is no key to apply for: ESPN
+authorises a browser session, so a private league can only be read by sending
+the two cookies that session holds, `espn_s2` and `SWID`. Take them from a
+browser tab signed in to the league (DevTools, Application, Cookies). They are
+credentials rather than identifiers, so they are held for the tab in
+`sessionStorage` rather than written to disk with the rest of your settings,
+they travel as headers rather than in a URL, and the data service passes them
+to ESPN without ever writing them to its cache. Close the tab to forget them.
+
+**Whether ESPN publishes picks while a draft is running is not settled.** The
+endpoint exists and returns the whole draft; whether it fills in live or only
+once the draft closes is undocumented, and the question has sat unanswered in
+the main community library since 2024. No claim is made here that it works.
+Test it against your own draft before you rely on it, and if nothing arrives,
+enter the picks by hand — which is why that landed alongside ESPN rather than
+after it.
+
 ## Layout
 
 ```
@@ -363,6 +430,7 @@ draft-room/
 │       ├── rankings.js      reads a ranking file from anywhere
 │       ├── sleeperLeague.js turns a real league into draft settings
 │       ├── sleeperDraft.js  a real draft: seats, keepers, order, live picks
+│       ├── espnDraft.js     the same, for a draft on ESPN
 │       ├── cache.js         six hour disk cache, serves stale on failure
 │       └── sources/         ffc.js, sleeper.js
 └── client/                  React and TypeScript, built with Vite
@@ -377,6 +445,7 @@ draft-room/
         │   ├── roster.ts    slots, flex, caps, best lineup
         │   ├── survival.ts  the odds a player lasts
         │   ├── value.ts     what waiting one turn costs, per position
+        │   ├── forecast.ts  this room, read and played forward
         │   ├── grade.ts     the two numbers at the end
         │   └── selftest.ts  the checks, run against live data
         └── components/      setup, draft, board, pool, roster, value, results, notes

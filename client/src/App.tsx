@@ -15,8 +15,8 @@ import type {
   AppMode, Board, CpuConfig, DeclaredKeeper, LeagueConfig, LeagueImport, LeagueSetup,
   NoteSet, Overrides, PendingKeeper, PresetPick, RankingSet, SavedLeague,
 } from './engine/types';
-import type { RankingSource } from './storage';
-import { load, save } from './storage';
+import type { EspnCredentials, RankingSource } from './storage';
+import { load, loadEspnCredentials, save, saveEspnCredentials } from './storage';
 
 type Screen = 'setup' | 'draft' | 'results';
 
@@ -29,6 +29,9 @@ export default function App() {
   const [pace, setPace] = useState(saved.pace);
 
   const [mode, setMode] = useState<AppMode>(saved.mode);
+  const [espnLeagueId, setEspnLeagueId] = useState<string | null>(saved.espnLeagueId);
+  // Credentials, so they are held for the tab and never written to disk.
+  const [espnCreds, setEspnCreds] = useState<EspnCredentials>(() => loadEspnCredentials());
   const [anonymous, setAnonymous] = useState(saved.anonymous);
 
   const [rankings, setRankings] = useState<RankingSet | null>(saved.rankings);
@@ -92,10 +95,12 @@ export default function App() {
   useEffect(() => {
     save({
       league, cpu, rankings, rankingSource, noteSource, overrides, savedLeagues, activeLeagueId,
-      cpuPreset: preset, pace, mode, anonymous, myManager, resumeLive,
+      cpuPreset: preset, pace, mode, anonymous, myManager, resumeLive, espnLeagueId,
     });
   }, [league, cpu, rankings, rankingSource, noteSource, overrides, savedLeagues, activeLeagueId,
-    preset, pace, mode, anonymous, myManager, resumeLive]);
+    preset, pace, mode, anonymous, myManager, resumeLive, espnLeagueId]);
+
+  useEffect(() => { saveEspnCredentials(espnCreds); }, [espnCreds]);
 
   const activeLeague = savedLeagues.find((l) => l.id === activeLeagueId) || null;
   const keepers = activeLeague?.keepers ?? [];
@@ -670,6 +675,10 @@ export default function App() {
 
       {screen === 'setup' && (
         <SetupScreen
+          espnLeagueId={espnLeagueId}
+          espnCreds={espnCreds}
+          onEspnLeagueId={setEspnLeagueId}
+          onEspnCreds={setEspnCreds}
           league={league}
           cpu={cpu}
           preset={preset}
@@ -777,6 +786,8 @@ export default function App() {
           mode={mode}
           anonymous={anonymous}
           draftId={importedLeague?.draftId ?? null}
+          espnLeagueId={espnLeagueId}
+          espnCreds={espnCreds}
           rankingEntries={rankings?.entries ?? null}
           notes={notes}
           onEngine={setEngine}

@@ -9,6 +9,7 @@ import RankingsPanel from './RankingsPanel';
 import ResumePanel from './ResumePanel';
 import Section from './Section';
 import useNarrow from '../useNarrow';
+import type { EspnCredentials } from '../storage';
 import { maskLeague } from '../anon';
 import type {
   AppMode, Board, CpuConfig, LeagueConfig, LeagueImport, LeagueSetup, NoteSet,
@@ -114,6 +115,10 @@ interface Props {
   myUserId: string | null;
   onMyUser: (userId: string) => void;
   onCheckDraft: () => void;
+  espnLeagueId: string | null;
+  espnCreds: EspnCredentials;
+  onEspnLeagueId: (id: string | null) => void;
+  onEspnCreds: (creds: EspnCredentials) => void;
 }
 
 function Stepper(props: {
@@ -144,6 +149,7 @@ export default function SetupScreen(props: Props) {
     resumeLive, onResumeLive, liveCount, liveBusy, liveStarted, hasDraft, startError,
     onCheckLive,
     setup, myUserId, onMyUser, onCheckDraft,
+    espnLeagueId, espnCreds, onEspnLeagueId, onEspnCreds,
   } = props;
 
   const activeLeague = savedLeagues.find((l) => l.id === activeLeagueId) || null;
@@ -350,6 +356,10 @@ export default function SetupScreen(props: Props) {
 
         {assistant && (
           <AssistantPanel
+            espnLeagueId={espnLeagueId}
+            espnCreds={espnCreds}
+            onEspnLeagueId={onEspnLeagueId}
+            onEspnCreds={onEspnCreds}
             league={activeLeague}
             setup={setup}
             myUserId={myUserId}

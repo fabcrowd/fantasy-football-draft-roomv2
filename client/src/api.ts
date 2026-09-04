@@ -117,6 +117,37 @@ export async function fetchDraftPicks(draftId: string, q: BoardQuery): Promise<L
   return res.json();
 }
 
+/** The two cookies a private ESPN league needs. Neither is ever persisted. */
+export interface EspnCredentials {
+  espnS2: string;
+  swid: string;
+}
+
+/**
+ * Follow a real ESPN draft.
+ *
+ * The cookies go in headers rather than the query string so they stay out of
+ * URLs, out of any access log and out of the browser history. They travel to
+ * this app's own data service and nowhere else.
+ */
+export async function fetchEspnDraftPicks(
+  leagueId: string,
+  q: BoardQuery,
+  creds: EspnCredentials | null,
+): Promise<LivePicks> {
+  const res = await fetch(
+    BASE + '/espn/draft/' + encodeURIComponent(leagueId) + '/picks?' + query(q),
+    {
+      cache: 'no-store',
+      headers: creds && (creds.espnS2 || creds.swid)
+        ? { 'x-espn-s2': creds.espnS2, 'x-espn-swid': creds.swid }
+        : {},
+    },
+  );
+  if (!res.ok) return fail(res);
+  return res.json();
+}
+
 /**
  * Read draft settings out of a real Sleeper league.
  * `force` skips the service cache, which is what Refresh is for.

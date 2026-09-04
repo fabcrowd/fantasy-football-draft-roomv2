@@ -65,6 +65,13 @@ export interface Saved {
    * how the next few rounds might fall.
    */
   resumeLive: boolean;
+  /**
+   * An ESPN league to follow, when the draft is not on Sleeper.
+   *
+   * The ID is kept the way a Sleeper league ID is. The two cookies that go
+   * with it are not: see `loadEspnCredentials`.
+   */
+  espnLeagueId: string | null;
 }
 
 /** The leagues this copy ships knowing about, blank until one is loaded. */
@@ -121,6 +128,7 @@ export function defaults(): Saved {
     pace: 140,
     myManager: DEFAULT_MANAGER,
     resumeLive: false,
+    espnLeagueId: null,
   };
 }
 
@@ -155,6 +163,7 @@ export function load(): Saved {
       noteSource: saved.noteSource ?? null,
       myManager: saved.myManager ?? DEFAULT_MANAGER,
       resumeLive: saved.resumeLive ?? false,
+      espnLeagueId: saved.espnLeagueId ?? null,
       // Older saves predate the per league fields. Fill them rather than let a
       // missing array reach a component that maps over it.
       savedLeagues: leagues.map((l) => ({
@@ -178,4 +187,44 @@ export function save(state: Saved): void {
   } catch {
     // A full or blocked storage is not worth interrupting a draft over.
   }
+}
+
+/**
+ * WHERE THE ESPN COOKIES LIVE, AND WHY IT IS NOT NEXT TO EVERYTHING ELSE
+ *
+ * A Sleeper league ID identifies a league. An ESPN `espn_s2` cookie is a
+ * signed-in session: anyone holding it can act as that person on ESPN until it
+ * expires. It is a credential, and a credential does not belong in the same
+ * store as a scoring format, where it would sit on disk until something else
+ * cleared it.
+ *
+ * So these two go in `sessionStorage`, which the browser drops when the tab
+ * closes. A reload during a draft keeps them, which is the case that matters;
+ * finishing the draft and closing the tab does not. They are sent to this
+ * app's own data service and to nothing else, and the service passes them
+ * straight to ESPN without ever writing them to its cache.
+ */
+const ESPN_KEY = 'draft-room-espn';
+
+export interface EspnCredentials {
+  espnS2: string;
+  swid: string;
+}
+
+export function loadEspnCredentials(): EspnCredentials {
+  try {
+    const raw = sessionStorage.getItem(ESPN_KEY);
+    if (!raw) return { espnS2: '', swid: '' };
+    const parsed = JSON.parse(raw) as Partial<EspnCredentials>;
+    return { espnS2: String(parsed.espnS2 || ''), swid: String(parsed.swid || '') };
+  } catch {
+    return { espnS2: '', swid: '' };
+  }
+}
+
+export function saveEspnCredentials(creds: EspnCredentials): void {
+  try {
+    if (!creds.espnS2 && !creds.swid) sessionStorage.removeItem(ESPN_KEY);
+    else sessionStorage.setItem(ESPN_KEY, JSON.stringify(creds));
+  } catch { /* A browser with storage off still drafts. */ }
 }

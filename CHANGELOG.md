@@ -8,6 +8,40 @@ fixed.
 
 ---
 
+## 1.3.0 — 2026-09-04
+
+### Added
+
+**Odds read off your room.** The survival bar assumed every room drafts like
+the average of thousands of rooms. The computer teams already score players
+against their own open slots, and that model had only ever been pointed at an
+invented room. Pointed at the real one, and run a hundred and fifty times, it
+answers who is likely to be gone before your turn comes back. Those odds
+replace the ADP ones wherever they exist.
+
+The room's lean is measured against a simulated room with its dials at zero
+rather than against the ADP order, because an ordinary room already drafts away
+from ADP without leaning anywhere and that difference would otherwise be counted
+twice, once as a measurement and once as the roster need bonus that produced it.
+
+**Picks by hand.** Assistant mode used to refuse to open without a Sleeper
+league. A draft it cannot poll is still a draft worth having the board for, so
+it now opens ready to take the picks as you type them, and does so by default
+when no feed is set. The engine already recorded a pick against whoever was on
+the clock, so a typed pick is the same pick to the rosters, the board and the
+room model.
+
+**ESPN drafts.** A reader answering in the same shape the Sleeper one does.
+ESPN sends a numeric player id and no name, so its player list is cached and
+used to join; a private league is read with the user's own `espn_s2` and `SWID`
+cookies, which are held for the tab rather than written to disk, sent as headers
+rather than in a URL, and never cached by the service.
+
+Whether ESPN publishes picks while a draft is running is undocumented and
+unverified, and the panel says so on screen rather than implying otherwise.
+
+---
+
 ## 1.2.0 — 2026-09-04
 
 ### Added

@@ -813,6 +813,35 @@ input[type='range']::-moz-range-thumb {
   border-top: 1px solid var(--line);
 }
 
+/* ----------------------------------------------------------------- ESPN feed */
+
+.espn-fields { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+
+.espn-fields .field { display: grid; gap: 3px; }
+
+.espn-fields .field-label {
+  font-family: var(--narrow);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--chalk-3);
+}
+
+.espn-fields input {
+  padding: 6px 8px;
+  background: var(--felt-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--chalk);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.espn-fields input:focus { outline: 1px solid var(--gold-dim); }
+
+.espn-fields .hint { text-transform: none; letter-spacing: 0; margin: 0; }
+
 /* ------------------------------------------------------- the cost of waiting */
 
 /*
