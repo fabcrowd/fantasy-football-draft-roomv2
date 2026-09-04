@@ -94,7 +94,31 @@ function safeName(key) {
  * @param {() => Promise<any>} fetcher
  * @param {boolean} force      ignore the cached copy and re-fetch
  */
+/**
+ * Fetches that are already running, by key.
+ *
+ * Without this, everything asking for a cold entry at once starts its own
+ * fetch. The live draft poll makes that concrete: it rebuilds the board every
+ * eight seconds, and a feed that takes longer than that to answer would have a
+ * second fetch under way before the first came back, then a third. Sharing the
+ * promise means the first caller pays and the rest wait on it.
+ */
+const inFlight = new Map();
+
 export async function cached(key, maxAgeMs, fetcher, force = false) {
+  const running = inFlight.get(key);
+  if (running && !force) return running;
+
+  const work = fetchOnce(key, maxAgeMs, fetcher, force);
+  inFlight.set(key, work);
+  try {
+    return await work;
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+async function fetchOnce(key, maxAgeMs, fetcher, force) {
   const file = join(CACHE_DIR, safeName(key));
   const now = Date.now();
 

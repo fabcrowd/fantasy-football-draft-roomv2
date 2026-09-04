@@ -813,6 +813,10 @@ input[type='range']::-moz-range-thumb {
   border-top: 1px solid var(--line);
 }
 
+/* A player the sources cannot agree on. The number is the gap, in picks. */
+.player-num.is-split { color: var(--te); }
+.player-num.is-split small { color: var(--te); opacity: 0.85; }
+
 /* ----------------------------------------------------------------- ESPN feed */
 
 .espn-fields { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }

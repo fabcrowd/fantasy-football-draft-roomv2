@@ -5,10 +5,19 @@ import type { Player, Position } from '../engine/types';
 import { POSITIONS } from '../engine/types';
 
 const SORT_WORDS: Record<SortKey, string> = {
-  adp: 'ADP', mine: 'My rank', points: 'Points', odds: 'Going soon',
+  adp: 'ADP', mine: 'My rank', points: 'Points', odds: 'Going soon', split: 'Sources split',
 };
 
-export type SortKey = 'adp' | 'mine' | 'points' | 'odds';
+export type SortKey = 'adp' | 'mine' | 'points' | 'odds' | 'split';
+
+/**
+ * How far apart the sources have to be before it is worth marking, in picks.
+ *
+ * Two sources measuring the same drafts a few picks apart is noise. Most of a
+ * round apart is a disagreement, and the reason to look at it is that one of
+ * them is wrong about a player you might be about to take.
+ */
+const SPLIT_WORTH_MARKING = 12;
 
 interface Props {
   players: Player[];
@@ -62,6 +71,25 @@ function PlayerNote({ text }: { text: string }) {
   );
 }
 
+/**
+ * Which source said what, for the row you are hovering.
+ *
+ * The consensus is a mean, and a mean hides whether three sources agreed or
+ * two disagreed violently. This is the way back to the numbers behind it.
+ */
+function sourceTitle(p: Player): string {
+  const parts = [
+    p.sleeperAdp != null ? 'Sleeper ' + p.sleeperAdp.toFixed(1) : null,
+    p.ffcAdp != null ? 'FFC ' + p.ffcAdp.toFixed(1) : null,
+    p.espnPick != null && p.espnVotes ? 'ESPN ' + p.espnPick.toFixed(1) : null,
+  ].filter(Boolean);
+  if (!parts.length) return 'No source ranked him.';
+  const head = parts.join(' · ');
+  return p.consensusSpread != null
+    ? head + '  (' + Math.round(p.consensusSpread) + ' picks apart)'
+    : head + '  (one source only)';
+}
+
 function pickLabel(overall: number, teams: number): string {
   const round = Math.floor((overall - 1) / teams) + 1;
   const slot = ((overall - 1) % teams) + 1;
@@ -103,6 +131,10 @@ export default function PlayerPool(props: Props) {
       if (sort === 'mine') return a.mine - b.mine || a.player.adp - b.player.adp;
       if (sort === 'points') return (b.player.points ?? -1) - (a.player.points ?? -1);
       if (sort === 'odds') return a.odds - b.odds || a.player.adp - b.player.adp;
+      if (sort === 'split') {
+        return (b.player.consensusSpread ?? -1) - (a.player.consensusSpread ?? -1)
+          || a.player.adp - b.player.adp;
+      }
       return a.player.adp - b.player.adp;
     });
 
@@ -197,6 +229,7 @@ export default function PlayerPool(props: Props) {
           const queued = queue.includes(player.id);
           const pct = Math.round(odds * 100);
           const note = notes?.get(player.id) ?? null;
+          const split = (player.consensusSpread ?? 0) >= SPLIT_WORTH_MARKING;
           return (
             <div
               key={player.id}
@@ -239,6 +272,14 @@ export default function PlayerPool(props: Props) {
               <span className="player-num">
                 <b>{player.adp.toFixed(1)}</b>
                 <small>ADP</small>
+              </span>
+
+              <span
+                className={'player-num' + (split ? ' is-split' : '')}
+                title={sourceTitle(player)}
+              >
+                <b>{player.consensus != null ? player.consensus.toFixed(1) : '—'}</b>
+                <small>{split ? 'SPLIT ' + Math.round(player.consensusSpread!) : 'CONS'}</small>
               </span>
 
               <span className="player-num">

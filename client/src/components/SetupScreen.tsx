@@ -26,9 +26,10 @@ const SCORING = [
 ];
 
 const ADP_SOURCES = [
+  { id: 'consensus', label: 'Consensus of all three sources' },
   { id: 'sleeper', label: 'Sleeper, then Fantasy Football Calculator' },
   { id: 'ffc', label: 'Fantasy Football Calculator, then Sleeper' },
-  { id: 'blend', label: 'The mean of both' },
+  { id: 'blend', label: 'The mean of Sleeper and Fantasy Football Calculator' },
 ];
 
 const DRAFT_TYPES = [

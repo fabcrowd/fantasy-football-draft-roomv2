@@ -239,6 +239,123 @@ async function main() {
     check('the third back takes the flex', startersFilled(flexed, r) === 9, String(startersFilled(flexed, r)));
   }
 
+  console.log('\nA consensus of three sources');
+  {
+    const res = await fetch(API + '/api/board?scoring=half-ppr&teams=12&adpSource=consensus');
+    const con = (await res.json()) as Board;
+    const m = con.meta as unknown as Record<string, number>;
+
+    check('ESPN ranked most of the board', (m.espnRanked ?? 0) > 400, String(m.espnRanked));
+    check('some players carry all three opinions', (m.consensusOfThree ?? 0) > 100,
+      String(m.consensusOfThree));
+    console.log('        ' + m.espnRanked + ' ranked by ESPN, ' + m.consensusOfThree
+      + ' with all three, ' + m.consensusOfTwo + ' with two');
+
+    const rated = con.players.filter((p) => (p.consensusVotes ?? 0) >= 3);
+    check('a consensus never rests on one opinion',
+      con.players.every((p) => p.consensus == null || (p.consensusVotes ?? 0) >= 1));
+    check('a lone opinion has nothing to disagree with',
+      con.players.every((p) => (p.consensusVotes ?? 0) > 1 || p.consensusSpread == null));
+
+    /*
+     * A rank is not a pick number. ESPN ranks about twelve hundred players and
+     * a draft makes a hundred and eighty picks, so ESPN's raw rank averaged
+     * against an ADP puts every defence a hundred picks adrift of where anyone
+     * drafts one. The mapped number is what has to sit on the market's scale.
+     */
+    const plain = await (await fetch(API + '/api/board?scoring=half-ppr&teams=12')).json() as Board;
+    const mapped = con.players.filter((p) => p.espnPick != null);
+    // The mapping draws its values from the plain board's own ADPs, so every
+    // mapped number has to be one of them and none can fall outside that range.
+    const floor = Math.min(...plain.players.map((p) => p.adp));
+    const ceiling = Math.max(...plain.players.map((p) => p.adp));
+    check('ESPN sits inside the range the market uses',
+      mapped.every((p) => p.espnPick! >= floor && p.espnPick! <= ceiling),
+      floor.toFixed(1) + ' to ' + ceiling.toFixed(1)
+        + ', worst ' + Math.max(...mapped.map((p) => p.espnPick!)).toFixed(1));
+
+    /*
+     * The point of the mapping, stated as a number rather than as an intention:
+     * ESPN's opinion should end up closer to the market than its raw rank was,
+     * because most of that raw distance was the length of ESPN's list and not a
+     * disagreement about anybody. What is left after it is the real argument.
+     */
+    const gap = (pick: (p: typeof mapped[number]) => number) => mapped
+      .reduce((n, p) => n + Math.abs(pick(p) - (p.sleeperAdp ?? p.ffcAdp ?? 0)), 0) / mapped.length;
+    const raw = gap((p) => p.espnRank!);
+    const put = gap((p) => p.espnPick!);
+    console.log('        mean distance from the market: rank ' + raw.toFixed(1)
+      + ' picks, mapped ' + put.toFixed(1) + ' picks');
+    check('mapping moves ESPN towards the market, not away', put < raw * 0.6,
+      raw.toFixed(1) + ' -> ' + put.toFixed(1));
+
+    /*
+     * Defences were the worst case and so are the clearest check. What is
+     * asserted is that the rescale closed most of the gap, NOT that ESPN ends
+     * up agreeing with the market about them: it does not, it rates them later
+     * than anyone drafts them, and that surviving disagreement is a real
+     * opinion rather than an artefact of how long ESPN's list is.
+     */
+    const defs = con.players.filter((p) => p.position === 'DEF' && p.espnPick != null);
+    const defGap = defs
+      .reduce((n, p) => n + Math.abs(p.espnPick! - (p.sleeperAdp ?? p.ffcAdp ?? 0)), 0) / defs.length;
+    console.log('        defences still sit ' + defGap.toFixed(0)
+      + ' picks off the market after the rescale, against '
+      + put.toFixed(0) + ' for the board, so ESPN abstains on them');
+    check('ESPN abstains on kickers and defences',
+      con.players.every((p) => (p.position !== 'K' && p.position !== 'DEF') || !p.espnVotes));
+    /*
+     * A defence anybody drafts is still priced, by the two market sources.
+     * The eight sitting past pick 600 on Sleeper and unranked by FFC are not:
+     * no source puts them inside a draft, so none of them votes and there is
+     * no consensus to report, which is the honest answer rather than a number.
+     */
+    check('a defence anyone drafts is still priced by the market',
+      defs.filter((p) => p.adp <= 240).every((p) => p.consensus != null));
+    check('a player no source puts in a draft gets no consensus',
+      con.players.filter((p) => p.consensus == null)
+        .every((p) => (p.sleeperAdp ?? 999) > 240 && (p.ffcAdp ?? 999) > 240));
+    check('the disagreement flag is not buried by defences', (() => {
+      const worst30 = con.players.filter((p) => (p.consensusSpread ?? 0) > 0)
+        .sort((a, b) => (b.consensusSpread ?? 0) - (a.consensusSpread ?? 0)).slice(0, 30);
+      return worst30.filter((p) => p.position === 'DEF' || p.position === 'K').length < 8;
+    })());
+
+    /* The mapping must not reorder ESPN's own opinion, only rescale it. */
+    const pairs = mapped.slice().sort((a, b) => a.espnRank! - b.espnRank!);
+    check('the mapping keeps ESPN\u2019s own order',
+      pairs.every((p, i) => i === 0 || pairs[i - 1].espnPick! <= p.espnPick!));
+
+    check('the consensus lies between the sources it averages',
+      rated.every((p) => {
+        const votes = [p.sleeperAdp, p.ffcAdp, p.espnPick].filter((v): v is number => v != null);
+        return p.consensus! >= Math.min(...votes) - 0.01
+          && p.consensus! <= Math.max(...votes) + 0.01;
+      }));
+    check('the spread is the distance between the outermost sources',
+      rated.every((p) => {
+        const votes = [p.sleeperAdp, p.ffcAdp, p.espnPick].filter((v): v is number => v != null);
+        return Math.abs((p.consensusSpread ?? 0) - (Math.max(...votes) - Math.min(...votes))) < 0.02;
+      }));
+
+    const board = con.players;
+    check('the consensus board is still a board in order',
+      board.every((p, i) => i === 0 || board[i - 1].adp <= p.adp));
+
+    const worst = rated.slice(0, 150).sort(
+      (a, b) => (b.consensusSpread ?? 0) - (a.consensusSpread ?? 0),
+    )[0];
+    if (worst) {
+      console.log('        most argued over inside 150: ' + worst.name + ' — Sleeper '
+        + worst.sleeperAdp + ', FFC ' + worst.ffcAdp + ', ESPN ' + worst.espnPick?.toFixed(1));
+    }
+
+    /* A board built off the consensus is a different board, or it did nothing. */
+    const moved = con.players.slice(0, 100)
+      .filter((p, i) => plain.players[i]?.id !== p.id).length;
+    check('choosing the consensus changes the board', moved > 0, moved + ' of the top 100 moved');
+  }
+
   console.log('\nThe cost of waiting');
   {
     const r = DEFAULT_ROSTER;

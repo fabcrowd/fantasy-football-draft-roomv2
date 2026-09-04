@@ -21,6 +21,21 @@ export interface Player {
   injuryStatus: string | null;
   timesDrafted: number;
   sources: string[];
+  /** ESPN's published draft rank, over every player ESPN ranks. */
+  espnRank?: number | null;
+  /** That rank read as a pick on this board's scale, which is what averages. */
+  espnPick?: number | null;
+  /** False for kickers and defences, where ESPN's rank is roster convention. */
+  espnVotes?: boolean;
+  /** ESPN's own ADP, carried for display and left out of the average. */
+  espnAdp?: number | null;
+  espnAuction?: number | null;
+  /** The mean of the sources that had an opinion, in picks. */
+  consensus?: number | null;
+  /** How far apart they are, in picks. Null when only one source voted. */
+  consensusSpread?: number | null;
+  /** How many of the three voted. One is not a consensus. */
+  consensusVotes?: number;
 }
 
 export interface BoardMeta {
