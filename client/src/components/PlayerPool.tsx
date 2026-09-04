@@ -176,7 +176,7 @@ export default function PlayerPool(props: Props) {
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
             >
-              {(['adp', 'mine', 'points', 'odds'] as SortKey[])
+              {(['adp', 'mine', 'points', 'odds', 'split'] as SortKey[])
                 .filter((k) => k !== 'mine' || myRank)
                 .map((k) => <option key={k} value={k}>{SORT_WORDS[k]}</option>)}
             </select>
@@ -214,6 +214,10 @@ export default function PlayerPool(props: Props) {
           <button type="button" className="chip" aria-pressed={sort === 'odds'} onClick={() => setSort('odds')}>
             <span className="on-wide">Least likely to last</span>
             <span className="on-narrow">Going soon</span>
+          </button>
+          <button type="button" className="chip" aria-pressed={sort === 'split'} onClick={() => setSort('split')}>
+            <span className="on-wide">Sources disagree</span>
+            <span className="on-narrow">Split</span>
           </button>
         </div>
       </div>
