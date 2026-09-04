@@ -8,6 +8,34 @@ fixed.
 
 ---
 
+## 1.2.0 — 2026-09-04
+
+### Added
+
+**The cost of waiting, per position.** The survival bar answers whether a
+player will last. It does not answer the question you have on the clock, which
+is whether that matters. A back with a twenty per cent chance of lasting is a
+crisis when the next back is forty points worse and a shrug when the next one
+is three points worse, and nothing on the board told the two apart.
+
+Above your roster, every position now carries what this pick buys you over your
+next one: the best player there now, in points over a replacement starter,
+against the value you can expect to still be there when your turn comes back
+around. The position that costs most to skip sorts to the top. Beside it, how
+many players are left before the biggest drop, which is the difference between
+a run you have to get ahead of and a tier you can wait out.
+
+Replacement level is read off the market rather than a table of made up flex
+shares: count what the first `teams * starters` picks actually hold, floored at
+the number a league has to start. A superflex league drafts quarterbacks
+earlier, so more of them fall inside that window and the quarterback
+replacement moves down on its own.
+
+It reads ADP and not this room, the same limit the survival bar carries, and
+the panel says so under the numbers. A run already under way will not show.
+
+---
+
 ## 1.1.0 — 2026-09-01
 
 ### Added

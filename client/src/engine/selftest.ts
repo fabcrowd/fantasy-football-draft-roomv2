@@ -21,6 +21,7 @@ import {
   keeperPicksIn, pickOrder, picksForTeam, picksInRound, roundOrder, seatOf,
 } from './order';
 import { DEFAULT_ROSTER, bestLineup, rosterSize, startersFilled } from './roster';
+import { positionValues, replacementPoints } from './value';
 import type { Board, CpuConfig, LeagueConfig, Position, RosterSlots } from './types';
 import { POSITIONS } from './types';
 
@@ -235,6 +236,86 @@ async function main() {
     check('three quarterbacks fill one slot', startersFilled(three, r) === 1, String(startersFilled(three, r)));
     const flexed = { QB: 1, RB: 3, WR: 2, TE: 1, K: 1, DEF: 1 } as Record<Position, number>;
     check('the third back takes the flex', startersFilled(flexed, r) === 9, String(startersFilled(flexed, r)));
+  }
+
+  console.log('\nThe cost of waiting');
+  {
+    const r = DEFAULT_ROSTER;
+    const all = board.players;
+    const byAdp = [...all].sort((a, b) => a.adp - b.adp);
+    /** A rough draft state: the players the market takes first are gone. */
+    const after = (n: number) => byAdp.slice(n);
+
+    const rep = replacementPoints(all, 12, r);
+    check('every position has a replacement level', POSITIONS.every((p) => rep[p] > 0),
+      JSON.stringify(rep));
+    check('a replacement is worse than the best player at his position',
+      POSITIONS.every((pos) => {
+        const top = all.filter((p) => p.position === pos && p.points != null)
+          .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))[0];
+        return !top || (top.points ?? 0) > rep[pos];
+      }));
+    /*
+     * Kickers and defences never appear inside the starter window, so before
+     * the floor was added the best kicker on the board was his own replacement
+     * and every kicker priced at exactly zero.
+     */
+    const kickers = all.filter((p) => p.position === 'K' && p.points != null)
+      .sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+    check('the best kicker is not his own replacement',
+      (kickers[0]?.points ?? 0) > rep.K, (kickers[0]?.points ?? 0) + ' vs ' + rep.K);
+
+    check('replacement level does not move as the draft runs',
+      JSON.stringify(replacementPoints(all, 12, r))
+        === JSON.stringify(replacementPoints(all, 12, r)));
+    const deeper = replacementPoints(all, 14, r);
+    check('a deeper league has a worse replacement back', deeper.RB < rep.RB,
+      deeper.RB + ' vs ' + rep.RB);
+
+    const at20 = positionValues(after(19), all, 12, r, 20, 29);
+    check('every position is priced', at20.length === POSITIONS.length, String(at20.length));
+    check('waiting is never free money', at20.every((v) => v.cost >= -1e-9),
+      at20.map((v) => v.position + ' ' + v.cost.toFixed(1)).join(' '));
+    check('the costliest position comes first',
+      at20.every((v, i) => i === 0 || at20[i - 1].cost >= v.cost));
+    check('the best available at a position is the one shown',
+      at20.every((v) => {
+        const pool = after(19).filter((p) => p.position === v.position && p.points != null);
+        return !pool.length || pool.every((p) => (p.points ?? 0) <= (v.best?.points ?? 0));
+      }));
+
+    /*
+     * The whole claim of the panel: a longer wait costs more. Sixteen picks
+     * away cannot be cheaper than seven picks away at any position.
+     */
+    const soon = positionValues(after(19), all, 12, r, 20, 27);
+    const late = positionValues(after(19), all, 12, r, 20, 44);
+    check('a longer wait never costs less',
+      POSITIONS.every((pos) => {
+        const a = soon.find((v) => v.position === pos);
+        const b = late.find((v) => v.position === pos);
+        return !a || !b || b.cost >= a.cost - 1e-9;
+      }),
+      POSITIONS.map((pos) => pos + ' ' + (soon.find((v) => v.position === pos)?.cost ?? 0).toFixed(0)
+        + '->' + (late.find((v) => v.position === pos)?.cost ?? 0).toFixed(0)).join(' '));
+
+    const back = at20.find((v) => v.position === 'RB');
+    const tight = at20.find((v) => v.position === 'TE');
+    console.log('        at pick 20 with your next at 29: '
+      + at20.map((v) => v.position + ' ' + v.cost.toFixed(0)).join(', '));
+    check('a run of similar players is cheap to wait on',
+      !back || !tight || back.beforeCliff >= 1);
+
+    check('no next pick means nothing to lose by waiting',
+      positionValues(after(19), all, 12, r, 20, null).every((v) => v.cost === 0));
+
+    /*
+     * A position emptied of everyone worth starting is left out rather than
+     * priced at zero, which would read as "no drop off" and mean "nobody left".
+     */
+    const noBacks = after(19).filter((p) => p.position !== 'RB');
+    check('a position with nobody left is not priced',
+      positionValues(noBacks, all, 12, r, 20, 29).every((v) => v.position !== 'RB'));
   }
 
   console.log('\nA full draft, market settings');

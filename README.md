@@ -79,6 +79,10 @@ open on a tap; short ones just sit there.
 roster need dial, and seven presets. Every setting moves players by a number of
 picks, and the panel says how many.
 
+**The cost of waiting.** Beside your roster, every position is priced by what
+this pick buys you over your next one, so you know whether the player you like
+is worth reaching for or whether four just like him are still there.
+
 **A grade at the end.** Starting points and picks gained against ADP, side by
 side, for every team in the room.
 
@@ -302,6 +306,51 @@ real numbers down and the bar will not see it.
 
 ---
 
+## The cost of waiting
+
+The survival bar says whether a player lasts. This says whether it matters.
+
+Above your roster, each position carries three numbers: the best player there
+now in points over a replacement starter, the value you can expect to still be
+available at your next pick, and the difference. The difference is the cost of
+skipping that position this turn, and the position that costs most sorts to the
+top.
+
+```
+WR  Puka Nacua      -40    0% he lasts  ·  then a drop
+RB  James Cook III  -27    0% he lasts  ·  8 before the drop
+```
+
+Both are certain to be gone, and the survival bar can only say so twice. What
+separates them is what comes back around: the receiver you can expect to still
+be there is forty points below Nacua, while the back you can expect is twenty
+seven below Cook, because that tier runs eight deep and holds up. Skipping the
+receiver costs half again what skipping the back costs, and no number attached
+to a single player shows it.
+
+**Expected value, not a guess.** Walking a position in value order, a player is
+the best one left exactly when he survives and everyone above him does not.
+Those terms sum to the value you expect to find waiting. A player below
+replacement contributes nothing, because he is not a reason to wait.
+
+**Replacement level comes off the market.** A replacement is the first player at
+a position nobody has to start, so it depends on how many of that position the
+league starts in total — and the flex slots make that genuinely ambiguous.
+Rather than split them by invented shares, the split is counted out of the first
+`teams * starters` picks by ADP, floored at the number the league is obliged to
+start. A superflex league takes quarterbacks earlier, so more land inside that
+window and the quarterback replacement moves down on its own. A kicker never
+lands inside it at all, which is what the floor is for: without it the best
+kicker on the board was his own replacement and every kicker priced at zero.
+
+**How many before the drop** is the biggest fall in value inside a position's
+top nine. One means the player on screen is the tier; eight means the tier
+outlives your next turn.
+
+Like the survival bar, it reads ADP and not this room, and the panel says so
+under the numbers. A run already under way will not show.
+
+
 ## Layout
 
 ```
@@ -327,9 +376,10 @@ draft-room/
         │   ├── order.ts     snake, linear, third round reversal
         │   ├── roster.ts    slots, flex, caps, best lineup
         │   ├── survival.ts  the odds a player lasts
+        │   ├── value.ts     what waiting one turn costs, per position
         │   ├── grade.ts     the two numbers at the end
         │   └── selftest.ts  the checks, run against live data
-        └── components/      setup, draft, board, pool, roster, results, notes
+        └── components/      setup, draft, board, pool, roster, value, results, notes
 ```
 
 The draft runs in the browser. A pick has to land the instant you click it, and

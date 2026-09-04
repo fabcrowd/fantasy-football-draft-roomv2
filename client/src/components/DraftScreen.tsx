@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import DraftBoard from './DraftBoard';
 import PlayerPool from './PlayerPool';
+import ValuePanel from './ValuePanel';
 import RosterPanel from './RosterPanel';
 import {
   autoDraftRest, availablePlayers, createDraft, currentPick, currentTeam, draftPlayer,
@@ -325,6 +326,14 @@ export default function DraftScreen(props: Props) {
         </div>
 
         <div className={'panel roster-col' + (pane === 'roster' ? ' is-active' : '')}>
+          <ValuePanel
+            available={available}
+            all={board.players}
+            roster={state.league.roster}
+            teams={teams}
+            currentPick={pick}
+            myNextPick={oddsTarget}
+          />
           <RosterPanel
             players={myPlayers}
             roster={state.league.roster}
