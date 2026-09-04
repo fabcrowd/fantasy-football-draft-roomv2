@@ -13,6 +13,7 @@ import { ADP_SOURCES, FORMATS, buildBoard, nearestSize } from './board.js';
 import { parseRankings } from './rankings.js';
 import { importLeague } from './sleeperLeague.js';
 import { draftPicks, draftState, leagueSetup, leagueUsers } from './sleeperDraft.js';
+import { IS_ESPN_ID, cookieHeader, espnDraftPicks } from './espnDraft.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5178;
@@ -54,6 +55,33 @@ function readQuery(q) {
   const year = asked >= 2015 && asked <= DEFAULT_YEAR + 1 ? Math.trunc(asked) : DEFAULT_YEAR;
   return { format, adpSource, teams, year, force: q.force === '1' || q.force === 'true' };
 }
+
+/**
+ * Follow a real ESPN draft.
+ *
+ * The two cookies a private league needs arrive as headers rather than in the
+ * query string, so they stay out of URLs, out of access logs and out of the
+ * browser history. They are used for the one request and never cached: what is
+ * cached here is ESPN's public player list, never a league read with somebody's
+ * credentials.
+ */
+app.get('/api/espn/draft/:id/picks', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!IS_ESPN_ID.test(id)) {
+    res.status(400).json({ error: 'An ESPN league ID is a run of digits. Check the one you sent.' });
+    return;
+  }
+
+  const q = readQuery(req.query);
+  try {
+    const cookie = cookieHeader(req.get('x-espn-s2'), req.get('x-espn-swid'));
+    res.json(await espnDraftPicks(id, q, cookie));
+  } catch (err) {
+    // The message says what to do about it, so it is passed through rather
+    // than flattened into "could not read the draft".
+    res.status(502).json({ error: String(err.message || err) });
+  }
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, year: DEFAULT_YEAR, formats: FORMATS, adpSources: ADP_SOURCES });

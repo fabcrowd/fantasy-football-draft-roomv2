@@ -148,6 +148,14 @@ export default function SetupScreen(props: Props) {
 
   const activeLeague = savedLeagues.find((l) => l.id === activeLeagueId) || null;
   const assistant = mode === 'assistant';
+  /**
+   * Whether a feed will fill the board on its own.
+   *
+   * It is not a condition of following a draft, only of following one without
+   * typing. A draft on a site this app cannot read, or one whose feed turns out
+   * not to publish picks while it runs, is still a draft worth having the board
+   * for: assistant mode opens ready to take the picks by hand instead.
+   */
   const canFollow = assistant && !!importedLeague?.draftId && !!myUserId;
 
   // On a phone the sections close, and each states what it is set to on its own
@@ -270,9 +278,9 @@ export default function SetupScreen(props: Props) {
                 type="button"
                 className="btn is-primary"
                 onClick={onStart}
-                disabled={!board || loading || (assistant && !canFollow)}
+                disabled={!board || loading}
                 title={assistant && !canFollow
-                  ? 'Choose a league with a draft, and say which manager is you'
+                  ? 'No feed chosen, so the board opens ready for you to enter the picks'
                   : undefined}
               >
                 {assistant ? 'Follow the draft' : 'Start mock draft'}
@@ -781,13 +789,14 @@ export default function SetupScreen(props: Props) {
         type="button"
         className="btn is-primary"
         onClick={onStart}
-        disabled={!board || loading || (assistant && !canFollow)}
+        disabled={!board || loading}
       >
         {assistant ? 'Follow the draft' : 'Start mock draft'}
       </button>
       {assistant && !canFollow && (
         <p className="hint start-block">
-          Choose a league with a draft, and say which manager is you.
+          No feed chosen. Check the seats and the roster above are the ones your
+          draft uses, and the board will open ready for you to enter each pick.
         </p>
       )}
     </div>

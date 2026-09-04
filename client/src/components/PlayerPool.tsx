@@ -22,6 +22,14 @@ interface Props {
   queue: string[];
   onQueue: (id: string) => void;
   formatLabel: string;
+  /**
+   * The odds read off this room rather than off ADP, when a forecast exists.
+   *
+   * ADP answers what an average room does. Once real picks are on the board
+   * the room simulates forward from them, and a receiver run that ADP cannot
+   * see moves these numbers where it cannot move the other ones.
+   */
+  roomOdds: Map<string, number> | null;
 }
 
 /**
@@ -63,6 +71,7 @@ function pickLabel(overall: number, teams: number): string {
 export default function PlayerPool(props: Props) {
   const {
     players, myRank, notes, currentPick, myNextPick, teams, onDraft, canDraft, queue, onQueue,
+    roomOdds,
   } = props;
 
   const [search, setSearch] = useState('');
@@ -84,7 +93,9 @@ export default function PlayerPool(props: Props) {
 
     const scored = out.map((p) => ({
       player: p,
-      odds: myNextPick ? survivalOdds(p, currentPick, myNextPick) : 1,
+      odds: myNextPick
+        ? (roomOdds?.get(p.id) ?? survivalOdds(p, currentPick, myNextPick))
+        : 1,
       mine: myRank?.get(p.id) ?? Number.MAX_SAFE_INTEGER,
     }));
 
@@ -105,7 +116,7 @@ export default function PlayerPool(props: Props) {
      * player being gone rather than the list being short.
      */
     return scored;
-  }, [players, search, filter, sort, queue, myRank, currentPick, myNextPick]);
+  }, [players, search, filter, sort, queue, myRank, currentPick, myNextPick, roomOdds]);
 
   return (
     <>
@@ -247,6 +258,7 @@ export default function PlayerPool(props: Props) {
                   </span>
                   <span className="survival-odds">
                     {pct + '% to ' + pickLabel(myNextPick, teams)}
+                    {roomOdds?.has(player.id) ? ' · room' : ''}
                   </span>
                 </span>
               )}

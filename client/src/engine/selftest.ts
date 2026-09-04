@@ -12,7 +12,7 @@
 import { PRESETS, DEFAULT_CPU, applyBias } from './cpu';
 import {
   autoDraftRest, availablePlayers, createDraft, currentPick, currentTeam, draftPlayer,
-  nextUserChoice, presetFor, runCpuPick, runPresetsOnly, runToUserTurn, undoPick,
+  nextUserChoice, nextUserPick, presetFor, runCpuPick, runPresetsOnly, runToUserTurn, undoPick,
 } from './draft';
 import { NO_FIXTURES, loadFixtures } from './fixtures';
 import { biggestSteals, gradeDraft } from './grade';
@@ -22,6 +22,7 @@ import {
 } from './order';
 import { DEFAULT_ROSTER, bestLineup, rosterSize, startersFilled } from './roster';
 import { positionValues, replacementPoints } from './value';
+import { forecast, observedLean } from './forecast';
 import type { Board, CpuConfig, LeagueConfig, Position, RosterSlots } from './types';
 import { POSITIONS } from './types';
 
@@ -316,6 +317,92 @@ async function main() {
     const noBacks = after(19).filter((p) => p.position !== 'RB');
     check('a position with nobody left is not priced',
       positionValues(noBacks, all, 12, r, 20, 29).every((v) => v.position !== 'RB'));
+  }
+
+  console.log('\nReading the room');
+  {
+    const play = (cpu: CpuConfig, n: number) => {
+      let e = createDraft(league(), cpu, board.players, null);
+      while (e.state.picks.length < n && !e.state.done) e = runCpuPick(e);
+      return e;
+    };
+    const leanOf = (id: string) => {
+      const preset = PRESETS.find((p) => p.id === id)!;
+      return observedLean(play(preset.cpu, 36));
+    };
+
+    const market = leanOf('market');
+    const robust = leanOf('robust-rb');
+    const zero = leanOf('zero-rb');
+    const earlyQb = leanOf('early-qb');
+
+    console.log('        market ' + POSITIONS.map((p) => p + ' ' + market[p].toFixed(1)).join(' '));
+    console.log('        zero RB ' + POSITIONS.map((p) => p + ' ' + zero[p].toFixed(1)).join(' '));
+
+    /*
+     * The baseline is a simulated room with its dials at zero, not the ADP
+     * order. Measured against ADP an ordinary room reads as almost two points
+     * of anti-receiver lean, purely because ADP knows nothing about starting
+     * slots, and that lean would then be applied on top of the very roster
+     * need bonus that produced it.
+     */
+    check('an ordinary room reads as no lean',
+      POSITIONS.every((p) => Math.abs(market[p]) < 1.5),
+      POSITIONS.map((p) => p + ' ' + market[p].toFixed(1)).join(' '));
+
+    check('a room forcing backs reads as forcing backs', robust.RB > 1.5, robust.RB.toFixed(1));
+    check('a room fading backs reads as fading backs', zero.RB < -1.5, zero.RB.toFixed(1));
+    check('the two rooms are read apart', robust.RB - zero.RB > 4,
+      robust.RB.toFixed(1) + ' vs ' + zero.RB.toFixed(1));
+    check('a receiver room reads as a receiver room', zero.WR > market.WR + 1.5,
+      zero.WR.toFixed(1) + ' vs ' + market.WR.toFixed(1));
+    check('a quarterback run reads on the quarterback dial',
+      earlyQb.QB > market.QB + 1, earlyQb.QB.toFixed(1) + ' vs ' + market.QB.toFixed(1));
+
+    check('less than a round is not a reading',
+      POSITIONS.every((p) => observedLean(play(PRESETS[3].cpu, 6))[p] === 0));
+  }
+
+  console.log('\nForecasting the rest of the round');
+  {
+    let e = createDraft(league(), DEFAULT_CPU, board.players, null);
+    while (e.state.picks.length < 36 && !e.state.done) e = runCpuPick(e);
+
+    const from = currentPick(e.state);
+    const target = nextUserPick(e.state)!;
+    const f = forecast(e, 120)!;
+
+    check('a forecast is made', !!f && f.targetPick === target, String(f?.targetPick));
+    check('every chance is a chance',
+      [...f.survival.values()].every((v) => v >= 0 && v <= 1));
+    check('a player already gone has no chance to survive',
+      e.state.picks.every((p) => !f.survival.has(p.playerId)));
+    check('the picks it forecasts are the picks that happen',
+      Math.abs(POSITIONS.reduce((n, p) => n + f.taken[p], 0) - (target - from)) < 1e-6,
+      POSITIONS.reduce((n, p) => n + f.taken[p], 0) + ' vs ' + (target - from));
+
+    /*
+     * The forecast has to be replayable for the same reason the draft does:
+     * a number that changes when nothing changed cannot be acted on.
+     */
+    const again = forecast(e, 120)!;
+    check('the same board forecasts the same way',
+      [...f.survival].every(([id, v]) => again.survival.get(id) === v));
+
+    /* A player the whole room wants cannot be likelier to last than one nobody
+     * has a slot for, however their ADP reads. */
+    const top = e.state.availableIds.map((id) => e.byId.get(id)!)
+      .sort((a, b) => a.adp - b.adp);
+    check('the best player left is not the likeliest to last',
+      (f.survival.get(top[0].id) ?? 0) <= (f.survival.get(top[40].id) ?? 1) + 1e-9,
+      (f.survival.get(top[0].id) ?? 0) + ' vs ' + (f.survival.get(top[40].id) ?? 1));
+
+    const later = { ...e, state: { ...e.state, league: { ...e.state.league, mySlot: 5 } } };
+    check('a forecast with no turn left is no forecast',
+      forecast({ ...later, state: { ...later.state, done: true } }) === null);
+
+    const runs = POSITIONS.map((p) => p + ' ' + f.taken[p].toFixed(1)).join(' ');
+    console.log('        of the ' + (target - from) + ' picks before your turn: ' + runs);
   }
 
   console.log('\nA full draft, market settings');

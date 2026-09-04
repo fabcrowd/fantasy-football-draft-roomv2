@@ -837,6 +837,14 @@ input[type='range']::-moz-range-thumb {
 
 .value-flat { margin: 0 0 2px; text-transform: none; letter-spacing: 0; }
 
+/* What the room is doing, when it is doing anything. */
+.value-lean {
+  margin: 0;
+  padding: 7px var(--pad) 0;
+  font-size: 11px;
+  color: var(--gold);
+}
+
 .value-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; }
 
 .value-body { min-width: 0; }
